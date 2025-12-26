@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Grupos de Investigación</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #FFFFFF;
+      color: #333;
+    }
+    h2 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+    .contenedor {
+      background: #FFFFFF;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      border: 1px solid #CCCCCC;
+    }
+    .filters {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 15px;
+    }
+    .filters div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    input, select {
+      padding: 6px;
+      width: 220px;
+      border: 1px solid #CCCCCC;
+      border-radius: 5px;
+      background: #F9F9F9;
+      color: #333;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #5FED00;
+      background: #FFFFFF;
+    }
+    label {
+      font-weight: bold;
+      margin-bottom: 3px;
+      color: #333;
+    }
+    table.dataTable {
+      width: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #CCCCCC;
+      background: #FFFFFF;
+    }
+    th {
+      background: #E6E6E6;
+      color: #333;
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      color: #333;
+    }
+    .btn-ver {
+      display: inline-block;
+      background-color: #CCCCCC;
+      color: #000;
+      padding: 6px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-ver:hover {
+      background-color: #4EC600;
+      color: white;
+    }
+    .dataTables_wrapper {
+      width: 100%;
+    }
+    /* Ocultar el buscador nativo de DataTables */
+    .dataTables_filter {
+      display: none !important;
+    }
+    .dataTables_length, .dataTables_paginate {
+      margin-top: 10px !important;
+      padding: 10px 0;
+      color: #333;
+    }
+    .dataTables_info {
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<div class="contenedor">
+  <div class="filters">
+    <div>
+      <label>Grupo</label>
+      <input type="text" id="filtroGrupo" placeholder="Buscar grupo...">
+    </div>
+    <div>
+      <label>Línea de Investigación</label>
+      <select id="filtroLinea">
+        <option value="">-- Todas --</option>
+      </select>
+    </div>
+    <div>
+      <label>Coordinador</label>
+      <input type="text" id="filtroCoord" placeholder="Buscar coordinador...">
+    </div>
+  </div>
+
+  <table id="tabla" class="display">
+    <thead>
+      <tr>
+        <th>Grupo</th>
+        <th>Línea Investigación</th>
+        <th>Coordinador</th>
+        <th>Ficha</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const SHEET_ID = "1N3pob7cmwieHY45_M8E9aRSssdRvxG7uc8B2qWJ8vGg";
+const SHEET_NAME = "Hoja1";
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tq=&sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+
+let tabla;
+
+async function cargarDatos() {
+  try {
+    const res = await fetch("https://api.allorigins.win/get?url=" + encodeURIComponent(SHEET_URL));
+    const text = (await res.json()).contents;
+    const json = JSON.parse(text.substr(47).slice(0, -2));
+
+    // Procesar filas
+    let filas = json.table.rows.map(r => ({
+      grupo: r.c[0]?.v || "",
+      linea: r.c[1]?.v || "",
+      coord: r.c[2]?.v || "",
+      link: r.c[3]?.v || ""
+    }));
+
+    // 🔹 Quitar la primera fila (cabecera)
+    filas = filas.slice(1);
+
+    llenarSelectLineas(filas);
+    inicializarTabla(filas);
+  } catch (err) {
+    console.error(err);
+    //alert("No se pudieron cargar los datos. Verifica que la hoja esté publicada.");
+  }
+}
+
+function llenarSelectLineas(datos) {
+  const select = $('#filtroLinea');
+  const lineas = [...new Set(datos.map(d => d.linea).filter(Boolean))].sort();
+  lineas.forEach(l => select.append(`<option value="${l}">${l}</option>`));
+}
+
+function inicializarTabla(datos) {
+  tabla = $('#tabla').DataTable({
+    data: datos,
+    columns: [
+      { data: 'grupo' },
+      { data: 'linea' },
+      { data: 'coord' },
+      {
+        data: 'link',
+        render: function(data) {
+          if (!data) return '';
+          return `<a href="${data}" target="_blank" class="btn-ver" title="Ver ficha"><span style="font-size:16px;">🔎</span></a>`;
+        }
+      }
+    ],
+    language: { url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json" },
+    pageLength: 10,
+    dom: '<"top"l>rt<"bottom"ip><"clear">' // 🔹 sin search box
+  });
+
+  $.fn.dataTable.ext.search.push(function(settings, data) {
+    const grupo = $('#filtroGrupo').val().toLowerCase();
+    const linea = $('#filtroLinea').val().toLowerCase();
+    const coord = $('#filtroCoord').val().toLowerCase();
+
+    const colGrupo = data[0].toLowerCase();
+    const colLinea = data[1].toLowerCase();
+    const colCoord = data[2].toLowerCase();
+
+    return (!grupo || colGrupo.includes(grupo)) &&
+           (!linea || colLinea.includes(linea)) &&
+           (!coord || colCoord.includes(coord));
+  });
+
+  $('#filtroGrupo, #filtroCoord').on('keyup', () => tabla.draw());
+  $('#filtroLinea').on('change', () => tabla.draw());
+}
+
+cargarDatos();
+</script>
+
+</body>
+</html>
